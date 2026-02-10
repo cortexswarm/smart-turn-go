@@ -54,7 +54,10 @@ func bundledLibPlatform() string {
 // candidateBaseDirs returns base directories to search for bundled ONNX lib:
 // working directory first, then the directory of the running executable.
 func candidateBaseDirs() []string {
-	cwd, _ := os.Getwd()
+	cwd, err := os.Getwd()
+	if err != nil {
+		cwd = "."
+	}
 	exe, err := os.Executable()
 	if err != nil {
 		return []string{cwd}

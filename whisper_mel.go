@@ -28,10 +28,6 @@ func computeWhisperMelFromPadded(padded []float32) []float32 {
 		return nil
 	}
 	// STFT: 400 window, 160 hop -> 798 frames from 128000; we pad to 800
-	nFrames := (whisper8sSamples - whisperNFFT) / whisperHop
-	if nFrames > whisper8sFrames {
-		nFrames = whisper8sFrames
-	}
 	// Power spectrum: 400-point real FFT -> 201 bins
 	nBins := whisperNFFT/2 + 1
 	mel := make([]float32, whisperNMels*whisper8sFrames)

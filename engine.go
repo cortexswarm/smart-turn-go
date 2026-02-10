@@ -54,7 +54,7 @@ func New(cfg Config, cb Callbacks) (*Engine, error) {
 	}
 	st, err := newSmartTurn(cfg.SmartTurnModelPath)
 	if err != nil {
-		vad.destroy()
+		_ = vad.destroy()
 		return nil, err
 	}
 	seg := newSegmenter(cfg.SampleRate, cfg.ChunkSize, cfg.PreSpeechMs, cfg.StopMs, cfg.MaxDurationSeconds)
@@ -119,7 +119,9 @@ func (e *Engine) PushPCM(chunk []float32) error {
 		if e.cb.OnSpeechEnd != nil {
 			e.cb.OnSpeechEnd()
 		}
-		_, _ = e.smartTurn.run(res.Segment)
+		if _, err := e.smartTurn.run(res.Segment); err != nil && e.cb.OnError != nil {
+			e.cb.OnError(err)
+		}
 		if e.cb.OnSegmentReady != nil {
 			e.cb.OnSegmentReady(res.Segment)
 		}
@@ -143,6 +145,10 @@ func (e *Engine) Close() {
 	}
 	e.closed = true
 	e.listening = false
-	_ = e.vad.destroy()
-	_ = e.smartTurn.destroy()
+	if err := e.vad.destroy(); err != nil && e.cb.OnError != nil {
+		e.cb.OnError(err)
+	}
+	if err := e.smartTurn.destroy(); err != nil && e.cb.OnError != nil {
+		e.cb.OnError(err)
+	}
 }

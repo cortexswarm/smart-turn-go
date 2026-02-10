@@ -29,21 +29,23 @@ func newSmartTurn(modelPath string) (*smartTurn, error) {
 	if err != nil {
 		return nil, err
 	}
-	outputShape := ort.NewShape(1)
+	// Model output "logits" has shape (1, 1) — rank 2
+	outputShape := ort.NewShape(1, 1)
 	outputTensor, err := ort.NewEmptyTensor[float32](outputShape)
 	if err != nil {
-		inputTensor.Destroy()
+		_ = inputTensor.Destroy()
 		return nil, err
 	}
+	// Model output is named "logits" (sigmoid probability), not "output"
 	sess, err := ort.NewAdvancedSession(modelPath,
 		[]string{"input_features"},
-		[]string{"output"},
+		[]string{"logits"},
 		[]ort.Value{inputTensor},
 		[]ort.Value{outputTensor},
 		nil)
 	if err != nil {
-		inputTensor.Destroy()
-		outputTensor.Destroy()
+		_ = inputTensor.Destroy()
+		_ = outputTensor.Destroy()
 		return nil, err
 	}
 	return &smartTurn{session: sess, input: inputTensor, output: outputTensor}, nil

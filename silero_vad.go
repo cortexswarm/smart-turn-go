@@ -42,7 +42,7 @@ func newSileroVAD(modelPath string) (*sileroVAD, error) {
 	stateData := make([]float32, sileroStateSize)
 	stateTensor, err := ort.NewTensor(stateShape, stateData)
 	if err != nil {
-		inputTensor.Destroy()
+		_ = inputTensor.Destroy()
 		return nil, err
 	}
 
@@ -50,27 +50,27 @@ func newSileroVAD(modelPath string) (*sileroVAD, error) {
 	srData := []int64{16000}
 	srTensor, err := ort.NewTensor(srShape, srData)
 	if err != nil {
-		inputTensor.Destroy()
-		stateTensor.Destroy()
+		_ = inputTensor.Destroy()
+		_ = stateTensor.Destroy()
 		return nil, err
 	}
 
 	outputShape := ort.NewShape(1, 1)
 	outputTensor, err := ort.NewEmptyTensor[float32](outputShape)
 	if err != nil {
-		inputTensor.Destroy()
-		stateTensor.Destroy()
-		srTensor.Destroy()
+		_ = inputTensor.Destroy()
+		_ = stateTensor.Destroy()
+		_ = srTensor.Destroy()
 		return nil, err
 	}
 
 	stateOutShape := ort.NewShape(2, 1, 128)
 	stateOutTensor, err := ort.NewEmptyTensor[float32](stateOutShape)
 	if err != nil {
-		inputTensor.Destroy()
-		stateTensor.Destroy()
-		srTensor.Destroy()
-		outputTensor.Destroy()
+		_ = inputTensor.Destroy()
+		_ = stateTensor.Destroy()
+		_ = srTensor.Destroy()
+		_ = outputTensor.Destroy()
 		return nil, err
 	}
 
@@ -81,11 +81,11 @@ func newSileroVAD(modelPath string) (*sileroVAD, error) {
 		[]ort.Value{outputTensor, stateOutTensor},
 		nil)
 	if err != nil {
-		inputTensor.Destroy()
-		stateTensor.Destroy()
-		srTensor.Destroy()
-		outputTensor.Destroy()
-		stateOutTensor.Destroy()
+		_ = inputTensor.Destroy()
+		_ = stateTensor.Destroy()
+		_ = srTensor.Destroy()
+		_ = outputTensor.Destroy()
+		_ = stateOutTensor.Destroy()
 		return nil, err
 	}
 

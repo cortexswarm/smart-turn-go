@@ -109,7 +109,7 @@ func loadWAV(path string) (samples []float32, sampleRate int, err error) {
 	if err != nil {
 		return nil, 0, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	wavReader := wav.NewReader(f)
 	format, err := wavReader.Format()
@@ -149,7 +149,7 @@ func saveSegmentWAV(path string, samples []float32, sampleRate int) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	wavSamples := make([]wav.Sample, len(samples))
 	for i, v := range samples {
 		if v < -1 {
