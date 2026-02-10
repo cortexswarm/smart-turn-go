@@ -2,9 +2,15 @@ package smartturn
 
 import (
 	"errors"
+	"os"
 
 	ort "github.com/yalue/onnxruntime_go"
 )
+
+// EnvONNXRuntimeLib is the environment variable read before initializing ONNX.
+// If set, it is used as the ONNX Runtime shared library path (e.g. on macOS
+// after brew install onnxruntime, set to the path to libonnxruntime.dylib).
+const EnvONNXRuntimeLib = "ONNXRUNTIME_SHARED_LIBRARY_PATH"
 
 var (
 	ErrChunkSize = errors.New("chunk must be exactly 512 samples")
@@ -24,11 +30,19 @@ type Engine struct {
 }
 
 // New creates an engine from config and callbacks. It validates config, loads ONNX
-// models, and creates sessions. Call ort.SetSharedLibraryPath before New if the
-// onnxruntime shared library is not on the default path.
+// models, and creates sessions. The ONNX Runtime shared library path is set explicitly
+// (as recommended by onnxruntime_go): first from bundled lib under BundledLibDir
+// (e.g. lib/darwin_arm64/libonnxruntime.dylib), then overridden by EnvONNXRuntimeLib
+// if set. Call ort.SetSharedLibraryPath before New for any other custom path.
 func New(cfg Config, cb Callbacks) (*Engine, error) {
 	if err := validateConfig(cfg); err != nil {
 		return nil, err
+	}
+	// Set library path explicitly; default (onnxruntime.so on non-Windows) fails on macOS.
+	if path := os.Getenv(EnvONNXRuntimeLib); path != "" {
+		ort.SetSharedLibraryPath(path)
+	} else if bundled := resolveBundledLib(candidateBaseDirs()); bundled != "" {
+		ort.SetSharedLibraryPath(bundled)
 	}
 	if err := ort.InitializeEnvironment(); err != nil {
 		return nil, err

@@ -1,0 +1,33 @@
+# Build artifacts (not data/ which has bundled ONNX Runtime libs)
+/bin/
+*.exe
+*.exe~
+*.test
+*.out
+/dist/
+
+# Generated output
+output/
+
+# Go workspace (optional)
+go.work
+go.work.sum
+
+# IDE and editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local env (no secrets in repo)
+.env
+.env.local
+.env.*.local
+
+# Optional: large local test assets (uncomment if you don't want to track)
+# data/*.wav
