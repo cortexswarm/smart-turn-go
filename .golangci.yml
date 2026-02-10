@@ -12,7 +12,8 @@ run:
     - '.*\\.pb\\.go$'
 
 output:
-  format: colored-line-number
+  formats:
+    - colored-line-number
   print-issued-linter-name: true
   print-welcome: false
 
