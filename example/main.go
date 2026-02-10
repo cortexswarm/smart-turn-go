@@ -1,5 +1,5 @@
-// WAV test example: load a WAV file, convert to mono float32,
-// feed 512-sample chunks into the engine, and print callback events.
+// Run from repo root: go run ./example [wav_file] [output_dir]
+// Defaults: data/test.wav, output/
 package main
 
 import (
@@ -17,27 +17,29 @@ const (
 	segmentRate = 16000
 )
 
+var (
+	defaultWAV   = "data/test.wav"
+	defaultOut   = "output"
+	defaultModel = "data"
+)
+
 func main() {
-	if len(os.Args) < 2 {
-		fmt.Fprintf(os.Stderr, "Usage: %s <wav_file> [model_dir] [output_dir]\n", os.Args[0])
-		os.Exit(1)
+	wavPath := defaultWAV
+	outDir := defaultOut
+	if len(os.Args) >= 2 {
+		wavPath = os.Args[1]
 	}
-	wavPath := os.Args[1]
-	modelDir := "data"
-	outDir := "output"
 	if len(os.Args) >= 3 {
-		modelDir = os.Args[2]
+		outDir = os.Args[2]
 	}
-	if len(os.Args) >= 4 {
-		outDir = os.Args[3]
-	}
+
 	if err := os.MkdirAll(outDir, 0755); err != nil {
 		fmt.Fprintf(os.Stderr, "output dir: %v\n", err)
 		os.Exit(1)
 	}
-	var segmentNum int
-	sileroPath := filepath.Join(modelDir, "silero_vad.onnx")
-	smartTurnPath := filepath.Join(modelDir, "smart-turn-v3.2-cpu.onnx")
+
+	sileroPath := filepath.Join(defaultModel, "silero_vad.onnx")
+	smartTurnPath := filepath.Join(defaultModel, "smart-turn-v3.2-cpu.onnx")
 	if a, err := filepath.Abs(sileroPath); err == nil {
 		sileroPath = a
 	}
@@ -55,6 +57,7 @@ func main() {
 		SileroVADModelPath: sileroPath,
 		SmartTurnModelPath: smartTurnPath,
 	}
+	var segmentNum int
 	cb := smartturn.Callbacks{
 		OnListeningStarted: func() { fmt.Println("[event] listening started") },
 		OnListeningStopped: func() { fmt.Println("[event] listening stopped") },
@@ -147,7 +150,6 @@ func saveSegmentWAV(path string, samples []float32, sampleRate int) error {
 		return err
 	}
 	defer f.Close()
-	// go-wav Sample.Values[0] is the PCM value (e.g. 16-bit: -32768..32767)
 	wavSamples := make([]wav.Sample, len(samples))
 	for i, v := range samples {
 		if v < -1 {
