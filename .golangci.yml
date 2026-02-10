@@ -13,9 +13,7 @@ run:
 
 output:
   formats:
-    - colored-line-number
-  print-issued-linter-name: true
-  print-welcome: false
+    text: {}
 
 linters:
   enable:
