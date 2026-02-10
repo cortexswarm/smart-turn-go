@@ -3,7 +3,8 @@
 version: 2
 
 # No builds — library only; release is tag + changelog.
-builds: []
+builds:
+  - skip: true
 
 changelog:
   use: git
