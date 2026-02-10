@@ -69,9 +69,10 @@ func max(a, b int) int {
 
 // segmentResult is returned by processChunk when the segment ends.
 type segmentResult struct {
-	Started bool
-	Ended   bool
-	Segment []float32
+	Started        bool
+	Ended          bool
+	EndedBySilence bool   // true when segment ended due to trailing silence (VAD); false when capped at max duration
+	Segment        []float32
 }
 
 // processChunk updates segment state with one VAD result and chunk.
@@ -110,8 +111,14 @@ func (s *segmenter) processChunk(isSpeech bool, chunk []float32) segmentResult {
 		s.trailingChunks++
 	}
 
-	if s.trailingChunks >= s.cfg.stopChunks || s.sinceTrigger >= s.cfg.maxChunks {
+	if s.trailingChunks >= s.cfg.stopChunks {
 		out.Ended = true
+		out.EndedBySilence = true
+		out.Segment = s.segment
+		s.reset()
+	} else if s.sinceTrigger >= s.cfg.maxChunks {
+		out.Ended = true
+		out.EndedBySilence = false
 		out.Segment = s.segment
 		s.reset()
 	}

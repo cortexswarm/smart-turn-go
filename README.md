@@ -25,6 +25,8 @@ A production-grade, streaming Go SDK for detecting speech turns from continuous 
 
 - **Go 1.21+** (with CGO enabled):  
   Fetch dependencies with `go mod tidy` or `go get github.com/yalue/onnxruntime_go@v1.25.0`.
+  If you see _missing go.sum entry_ for `github.com/gen2brain/malgo` (e.g. when running `./examples/mic`), run:  
+  `go mod download github.com/gen2brain/malgo` or `go mod tidy`.
 - **ONNX Runtime Shared Library:**  
   - Typically bundled under `data/` (e.g. `data/onnxruntime_arm64.dylib`) or `lib/<GOOS>_<GOARCH>/`.  
   - If not found, set the `ONNXRUNTIME_SHARED_LIBRARY_PATH` environment variable.
@@ -92,16 +94,20 @@ Available callbacks:
 
 From the project root (models in `data/`):
 
-```bash
-go run ./examples/wav_test data/test.wav
-```
-
-Or, with a custom model directory:
+**WAV file** (defaults: `data/test.wav`, output to `output/`):
 
 ```bash
-go run ./examples/wav_test /path/to/audio.wav /path/to/models
+go run ./examples/file
+go run ./examples/file /path/to/audio.wav my_output
 ```
 
-- The example uses [github.com/youpy/go-wav](https://github.com/youpy/go-wav) to load WAVs, converts to mono `float32` (averages stereo input), splits audio into 512-sample chunks, and processes each chunk via the engine, printing events for all registered callbacks.
+**Live microphone** (captures from default mic, prints callbacks; requires [malgo](https://github.com/gen2brain/malgo)):
+
+```bash
+go get -u github.com/gen2brain/malgo
+go run ./examples/mic
+```
+
+- The WAV example (`examples/file/main.go`) uses [github.com/youpy/go-wav](https://github.com/youpy/go-wav) to load WAVs, converts to mono `float32`, and processes 512-sample chunks. The mic example (`examples/mic/main.go`) captures at 16 kHz mono via malgo and feeds the engine in real time.
 
 ---

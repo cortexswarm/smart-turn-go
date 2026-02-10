@@ -3,6 +3,7 @@ module github.com/bgaurav7/smart-turn-go
 go 1.25.7
 
 require (
+	github.com/gen2brain/malgo v0.11.24
 	github.com/yalue/onnxruntime_go v1.25.0
 	github.com/youpy/go-wav v0.3.2
 )

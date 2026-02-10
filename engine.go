@@ -119,8 +119,11 @@ func (e *Engine) PushPCM(chunk []float32) error {
 		if e.cb.OnSpeechEnd != nil {
 			e.cb.OnSpeechEnd()
 		}
-		if _, err := e.smartTurn.run(res.Segment); err != nil && e.cb.OnError != nil {
-			e.cb.OnError(err)
+		// Only run Smart-Turn when segment ended by VAD (trailing silence), not when capped at max duration
+		if res.EndedBySilence {
+			if _, err := e.smartTurn.run(res.Segment); err != nil && e.cb.OnError != nil {
+				e.cb.OnError(err)
+			}
 		}
 		if e.cb.OnSegmentReady != nil {
 			e.cb.OnSegmentReady(res.Segment)

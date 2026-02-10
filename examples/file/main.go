@@ -1,4 +1,4 @@
-// Run from repo root: go run ./example [wav_file] [output_dir]
+// Run from repo root: go run ./examples/file [wav_file] [output_dir]
 // Defaults: data/test.wav, output/
 package main
 
