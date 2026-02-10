@@ -1,53 +1,43 @@
 # smart-turn
 
-Production-grade streaming SDK in Go for detecting speech turns from continuous PCM audio using Silero VAD and the Smart-Turn ONNX model.
+A production-grade, streaming Go SDK for detecting speech turns from continuous PCM audio using Silero VAD and the Smart-Turn ONNX model.
 
-**Credits.** This project is a Go implementation built on the [**Smart Turn v3.2**](https://github.com/pipecat-ai/smart-turn) model and design from [pipecat-ai/smart-turn](https://github.com/pipecat-ai/smart-turn). Smart Turn is an open source, community-driven, native audio turn detection model (BSD 2-clause); we thank the Pipecat team and contributors for the original work. VAD is powered by [**Silero VAD**](https://github.com/snakers4/silero-vad) (MIT)—pre-trained enterprise-grade voice activity detection from the Silero team. ONNX inference uses [**yalue/onnxruntime_go**](https://github.com/yalue/onnxruntime_go) (MIT), a cross-platform Go wrapper for Microsoft ONNX Runtime.
+---
+
+## Credits
+
+- **Smart Turn v3.2 ([pipecat-ai/smart-turn](https://github.com/pipecat-ai/smart-turn), BSD 2-Clause)**: Open source, native audio turn detection model. Special thanks to the Pipecat team and contributors.
+- **Silero VAD ([snakers4/silero-vad](https://github.com/snakers4/silero-vad), MIT)**: Enterprise-grade voice activity detection models by Silero.
+- **ONNX Runtime Go Wrapper ([yalue/onnxruntime_go](https://github.com/yalue/onnxruntime_go), MIT)**: Cross-platform Go bindings for Microsoft ONNX Runtime.
+
+---
 
 ## Overview
 
-- **Language:** Go  
-- **Purpose:** Detect speech turns from continuous PCM (mono, 16 kHz, float32) using fixed 512-sample chunks.  
-- **Models:** Silero VAD and Smart-Turn v3.2 CPU (ONNX). No microphone capture or resampling; the host app supplies audio.
+- **Language:** Go
+- **Goal:** Detect speech turns from continuous mono PCM audio (16 kHz, `float32`), processed in fixed 512-sample frames.
+- **Models Used:** Silero VAD and Smart-Turn v3.2 (CPU/ONNX).
+- **Input:** Audio provided by the host application. No microphone capture or resampling in SDK.
+
+---
 
 ## Requirements
 
-- Go 1.21+ with **CGO enabled** (required by [github.com/yalue/onnxruntime_go](https://github.com/yalue/onnxruntime_go)). Run `go mod tidy` or `go get github.com/yalue/onnxruntime_go@v1.25.0` to fetch the dependency and populate `go.sum`.
-- **ONNX Runtime shared library.** You do **not** need `ONNXRUNTIME_SHARED_LIBRARY_PATH` if the runtime is bundled under **`data/`** (e.g. `data/onnxruntime_arm64.dylib`) or `lib/<GOOS>_<GOARCH>/`. The SDK resolves the path in that order, then falls back to the env var for overrides. [onnxruntime_go](https://github.com/yalue/onnxruntime_go) targets **ONNX Runtime 1.23.2**.
-- Model files (provided by you; not downloaded by the SDK):
+- **Go 1.21+** (with CGO enabled):  
+  Fetch dependencies with `go mod tidy` or `go get github.com/yalue/onnxruntime_go@v1.25.0`.
+- **ONNX Runtime Shared Library:**  
+  - Typically bundled under `data/` (e.g. `data/onnxruntime_arm64.dylib`) or `lib/<GOOS>_<GOARCH>/`.  
+  - If not found, set the `ONNXRUNTIME_SHARED_LIBRARY_PATH` environment variable.
+  - [onnxruntime_go](https://github.com/yalue/onnxruntime_go) targets ONNX Runtime 1.23.2.
+- **Model Files:** _(must be provided by user)_
   - `silero_vad.onnx`
   - `smart-turn-v3.2-cpu.onnx`
 
-## Project layout
-
-```
-smart-turn/
-├── go.mod
-├── config.go
-├── callbacks.go
-├── engine.go
-├── onnxruntime_lib.go
-├── silero_vad.go
-├── segment.go
-├── smart_turn.go
-├── whisper_mel.go
-├── data/
-│   ├── silero_vad.onnx
-│   ├── smart-turn-v3.2-cpu.onnx
-│   ├── onnxruntime_arm64.dylib   # optional: bundled ONNX Runtime (darwin arm64)
-│   ├── onnxruntime_amd64.dylib   # optional: darwin amd64
-│   ├── onnxruntime_arm64.so      # optional: linux arm64
-│   ├── onnxruntime_amd64.so      # optional: linux amd64
-│   └── onnxruntime.dll           # optional: windows
-├── examples/
-│   └── wav_test/
-│       └── main.go
-└── README.md
-```
-
-All code is in package `smartturn`. Only the SDK surface is exported; internal types (VAD, segmenter, Smart-Turn) are unexported.
+---
 
 ## Configuration
+
+Example setup:
 
 ```go
 cfg := smartturn.Config{
@@ -62,11 +52,16 @@ cfg := smartturn.Config{
 }
 ```
 
-All fields are validated in `New()`; invalid config or missing model files return an error.
+- All configuration fields are validated in `New()`.  
+- Invalid configs or missing model files produce an error.
+
+---
 
 ## Callbacks
 
-Callbacks are optional (nil allowed) and invoked **synchronously** from the same goroutine that calls `PushPCM`. The SDK does not spawn goroutines.
+All callbacks are **optional** (can be left `nil`) and are invoked **synchronously** from the same goroutine that calls `PushPCM`. The SDK does **NOT** spawn goroutines.
+
+Available callbacks:
 
 - `OnListeningStarted` / `OnListeningStopped`
 - `OnSpeechStart` / `OnSpeechEnd`
@@ -74,42 +69,39 @@ Callbacks are optional (nil allowed) and invoked **synchronously** from the same
 - `OnSegmentReady(segment []float32)`
 - `OnError(err error)`
 
+---
+
 ## Engine API
 
-- `New(cfg Config, cb Callbacks) (*Engine, error)` — validates config, loads ONNX sessions.
-- `Start()` / `Stop()` — toggles listening and invokes the corresponding callbacks.
-- `PushPCM(chunk []float32) error` — processes one chunk of **exactly 512** samples. Returns `ErrChunkSize` if length is wrong.
-- `Reset()` — resets VAD and segment state; sessions stay loaded.
-- `Close()` — releases ONNX resources; engine must not be used after.
+- `New(cfg Config, cb Callbacks) (*Engine, error)`  
+  Validates config; loads ONNX sessions.
+- `Start()` / `Stop()`  
+  Toggles listening, invokes relevant callbacks.
+- `PushPCM(chunk []float32) error`  
+  Processes a chunk (must be **exactly 512 samples**). Returns `ErrChunkSize` when length is incorrect.
+- `Reset()`  
+  Resets VAD and segment state but keeps model sessions loaded.
+- `Close()`  
+  Releases ONNX resources. Must not use the engine after closing.
 
-The engine is **single-threaded and not goroutine-safe**. Serialize all calls from the caller side.
+> **Note:** The engine is **single-threaded and not goroutine-safe**. All API calls should be serialized by the caller.
 
-## Example
+---
 
-From the repo root (with models in `data/`):
+## Example Usage
+
+From the project root (models in `data/`):
 
 ```bash
 go run ./examples/wav_test data/test.wav
 ```
 
-Or with a custom model directory:
+Or, with a custom model directory:
 
 ```bash
 go run ./examples/wav_test /path/to/audio.wav /path/to/models
 ```
 
-The example uses [github.com/youpy/go-wav](https://github.com/youpy/go-wav) to load a WAV file, converts to mono float32 (averaging channels for stereo), slices into 512-sample chunks, and feeds them to the engine while printing callback events.
+- The example uses [github.com/youpy/go-wav](https://github.com/youpy/go-wav) to load WAVs, converts to mono `float32` (averages stereo input), splits audio into 512-sample chunks, and processes each chunk via the engine, printing events for all registered callbacks.
 
-## Troubleshooting
-
-- **"Protobuf parsing failed"** when loading a model: the ONNX file may be corrupted or from an incompatible export. Use the official assets: [Silero VAD](https://github.com/snakers4/silero-vad) (e.g. `silero_vad.onnx` from the repo or releases), [Smart-Turn v3.2](https://github.com/pipecat-ai/smart-turn) (e.g. `smart-turn-v3.2-cpu.onnx`). The example resolves model paths to absolute paths to avoid CWD-related load issues.
-
-## Non-goals
-
-- No microphone capture, resampling, or concurrency inside the SDK.
-- No logging in hot paths.
-- No public exposure of ONNX or VAD internals.
-
-## License
-
-See LICENSE.
+---
