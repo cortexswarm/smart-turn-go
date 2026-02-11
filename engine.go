@@ -27,6 +27,9 @@ type Engine struct {
 
 	listening bool
 	closed    bool
+
+	segmentEmitSamples  int // target samples per OnSegmentReady slice
+	segmentEmittedSoFar int // how many samples of the current segment have been emitted
 }
 
 // New creates an engine from config and callbacks. It validates config, loads ONNX
@@ -61,6 +64,15 @@ func New(cfg Config, cb Callbacks) (*Engine, error) {
 	e.vad = vad
 	e.segmenter = seg
 	e.smartTurn = st
+	// Derive how many samples correspond to one emit interval.
+	if cfg.SegmentEmitMs > 0 {
+		e.segmentEmitSamples = int(float64(cfg.SegmentEmitMs) * float64(cfg.SampleRate) / 1000.0)
+		if e.segmentEmitSamples <= 0 {
+			e.segmentEmitSamples = cfg.ChunkSize
+		}
+	} else {
+		e.segmentEmitSamples = cfg.ChunkSize
+	}
 	return e, nil
 }
 
@@ -109,25 +121,44 @@ func (e *Engine) PushPCM(chunk []float32) error {
 	isSpeech := prob > e.cfg.VadThreshold
 
 	res := e.segmenter.processChunk(isSpeech, chunk)
+	// Reset emitted counter on a new segment.
+	if res.Started {
+		e.segmentEmittedSoFar = 0
+	}
 	if res.Started && e.cb.OnSpeechStart != nil {
 		e.cb.OnSpeechStart()
 	}
 	if e.cb.OnChunk != nil {
 		e.cb.OnChunk(chunk)
 	}
+
+	// While speech is active, res.Segment holds the full accumulated segment so far.
+	if len(res.Segment) > 0 && e.segmentEmitSamples > 0 && e.cb.OnSegmentReady != nil {
+		total := len(res.Segment)
+		// Emit fixed-size slices as we cross each interval boundary.
+		for total-e.segmentEmittedSoFar >= e.segmentEmitSamples {
+			start := e.segmentEmittedSoFar
+			end := start + e.segmentEmitSamples
+			slice := make([]float32, end-start)
+			copy(slice, res.Segment[start:end])
+			e.cb.OnSegmentReady(slice)
+			e.segmentEmittedSoFar = end
+		}
+	}
+
 	if res.Ended {
+		// Emit any remaining tail for this segment before speech end callback.
+		if len(res.Segment) > e.segmentEmittedSoFar && e.cb.OnSegmentReady != nil {
+			start := e.segmentEmittedSoFar
+			end := len(res.Segment)
+			slice := make([]float32, end-start)
+			copy(slice, res.Segment[start:end])
+			e.cb.OnSegmentReady(slice)
+		}
 		if e.cb.OnSpeechEnd != nil {
 			e.cb.OnSpeechEnd()
 		}
-		// Only run Smart-Turn when segment ended by VAD (trailing silence), not when capped at max duration
-		if res.EndedBySilence {
-			if _, err := e.smartTurn.run(res.Segment); err != nil && e.cb.OnError != nil {
-				e.cb.OnError(err)
-			}
-		}
-		if e.cb.OnSegmentReady != nil {
-			e.cb.OnSegmentReady(res.Segment)
-		}
+		e.segmentEmittedSoFar = 0
 	}
 	return nil
 }

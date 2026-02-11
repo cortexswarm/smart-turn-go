@@ -47,8 +47,9 @@ func main() {
 		ChunkSize:          chunkSize,
 		VadThreshold:       0.75,
 		PreSpeechMs:        200,
-		StopMs:             300,
+		StopMs:             500,
 		MaxDurationSeconds: 600,
+		SegmentEmitMs:      1000,
 		SileroVADModelPath: sileroPath,
 		SmartTurnModelPath: smartTurnPath,
 	}

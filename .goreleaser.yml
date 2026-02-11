@@ -18,7 +18,7 @@ changelog:
 
 release:
   github:
-    owner: bgaurav7
+    owner: cortexswarm
     name: smart-turn-go
   draft: false
   mode: replace

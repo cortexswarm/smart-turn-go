@@ -16,8 +16,12 @@ type Config struct {
 	ChunkSize          int     // must be 512
 	VadThreshold       float32 // speech probability threshold (e.g. 0.5)
 	PreSpeechMs        int     // ms of audio to keep before speech trigger (e.g. 200)
-	StopMs             int     // ms of trailing silence to end segment (e.g. 1000)
-	MaxDurationSeconds float32 // hard cap per segment in seconds (e.g. 8)
+	StopMs             int     // ms of trailing silence to end segment (e.g. 500)
+	MaxDurationSeconds float32 // hard cap per segment in seconds (e.g. 600 for 10 minutes)
+
+	// SegmentEmitMs controls how often OnSegmentReady is called while speech is active.
+	// For example, 1000 emits 1-second slices; any remaining tail is emitted before OnSpeechEnd.
+	SegmentEmitMs int
 
 	SileroVADModelPath string // path to silero_vad.onnx
 	SmartTurnModelPath string // path to smart-turn-v3.2-cpu.onnx
@@ -42,6 +46,9 @@ func validateConfig(cfg Config) error {
 	}
 	if cfg.MaxDurationSeconds <= 0 {
 		return errors.New("config: MaxDurationSeconds must be > 0")
+	}
+	if cfg.SegmentEmitMs <= 0 {
+		return errors.New("config: SegmentEmitMs must be > 0")
 	}
 	if cfg.SileroVADModelPath == "" {
 		return errors.New("config: SileroVADModelPath is required")
