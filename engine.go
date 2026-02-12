@@ -3,9 +3,16 @@ package smartturn
 import (
 	"errors"
 	"os"
+	"sync"
 
 	ort "github.com/yalue/onnxruntime_go"
 )
+
+// segmentEmitPool reuses buffers for OnSegmentReady to avoid per-emit allocations.
+// Callbacks must copy the slice if they need to retain it (engine may reuse the buffer).
+var segmentEmitPool = sync.Pool{
+	New: func() interface{} { return make([]float32, 0, 32000) }, // 2s @ 16kHz
+}
 
 // EnvONNXRuntimeLib is the environment variable read before initializing ONNX.
 // If set, it is used as the ONNX Runtime shared library path (e.g. on macOS
@@ -171,9 +178,16 @@ func (e *Engine) PushPCM(chunk []float32) error {
 		for total-e.segmentEmittedSoFar >= e.segmentEmitSamples {
 			start := e.segmentEmittedSoFar
 			end := start + e.segmentEmitSamples
-			slice := make([]float32, end-start)
+			n := end - start
+			slice := segmentEmitPool.Get().([]float32)
+			if cap(slice) < n {
+				slice = make([]float32, n)
+			} else {
+				slice = slice[:n]
+			}
 			copy(slice, res.Segment[start:end])
 			e.cb.OnSegmentReady(slice)
+			segmentEmitPool.Put(slice)
 			e.segmentEmittedSoFar = end
 		}
 	}
@@ -185,9 +199,16 @@ func (e *Engine) PushPCM(chunk []float32) error {
 		if len(res.Segment) > e.segmentEmittedSoFar && e.cb.OnSegmentReady != nil {
 			start := e.segmentEmittedSoFar
 			end := len(res.Segment)
-			slice := make([]float32, end-start)
+			n := end - start
+			slice := segmentEmitPool.Get().([]float32)
+			if cap(slice) < n {
+				slice = make([]float32, n)
+			} else {
+				slice = slice[:n]
+			}
 			copy(slice, res.Segment[start:end])
 			e.cb.OnSegmentReady(slice)
+			segmentEmitPool.Put(slice)
 		}
 
 		// Best-effort Smart-Turn inference on the full segment. If the model

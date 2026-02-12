@@ -11,6 +11,7 @@ type Callbacks struct {
 	OnSpeechEnd   func()
 
 	OnChunk        func(chunk []float32)
+	// OnSegmentReady receives segment audio; the engine may reuse the slice after the callback returns—copy if retaining.
 	OnSegmentReady func(segment []float32)
 
 	// OnTurnPrediction receives Smart-Turn's decision when a segment ends by VAD

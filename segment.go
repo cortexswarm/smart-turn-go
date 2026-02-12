@@ -1,5 +1,12 @@
 package smartturn
 
+import "sync"
+
+// chunkPool reuses 512-sample buffers to avoid per-chunk allocations in the hot path.
+var chunkPool = sync.Pool{
+	New: func() interface{} { return make([]float32, RequiredChunkSize) },
+}
+
 // segmenter holds state for the segmentation state machine. Pure logic; no ONNX, no callbacks.
 type segmenter struct {
 	cfg configSegment
@@ -84,10 +91,13 @@ func (s *segmenter) processChunk(isSpeech bool, chunk []float32) segmentResult {
 		return out
 	}
 
-	chunkCopy := make([]float32, len(chunk))
+	chunkCopy := chunkPool.Get().([]float32)
 	copy(chunkCopy, chunk)
 
 	if !s.speechActive {
+		if old := s.preBuffer[s.preBufIdx]; old != nil {
+			chunkPool.Put(old)
+		}
 		s.preBuffer[s.preBufIdx] = chunkCopy
 		s.preBufIdx = (s.preBufIdx + 1) % s.cfg.preChunks
 		if s.preBufCount < s.cfg.preChunks {
@@ -105,6 +115,7 @@ func (s *segmenter) processChunk(isSpeech bool, chunk []float32) segmentResult {
 	}
 
 	s.segment = append(s.segment, chunkCopy...)
+	chunkPool.Put(chunkCopy)
 	out.Segment = s.segment
 	s.sinceTrigger++
 	if isSpeech {
@@ -149,6 +160,9 @@ func (s *segmenter) reset() {
 	s.preBufIdx = 0
 	s.preBufCount = 0
 	for i := range s.preBuffer {
-		s.preBuffer[i] = nil
+		if s.preBuffer[i] != nil {
+			chunkPool.Put(s.preBuffer[i])
+			s.preBuffer[i] = nil
+		}
 	}
 }

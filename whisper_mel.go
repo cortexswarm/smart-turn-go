@@ -29,18 +29,19 @@ func computeWhisperMel(audio []float32) []float32 {
 	if len(audio) > whisper8sSamples {
 		audio = audio[len(audio)-whisper8sSamples:]
 	}
-	// Zero-mean, unit-variance normalize on the non-padded samples.
-	var mean float64
+	// Zero-mean, unit-variance normalize (single-pass for mean and variance).
+	n := float64(len(audio))
+	var sum, sumSq float64
 	for _, v := range audio {
-		mean += float64(v)
+		x := float64(v)
+		sum += x
+		sumSq += x * x
 	}
-	mean /= float64(len(audio))
-	var variance float64
-	for _, v := range audio {
-		d := float64(v) - mean
-		variance += d * d
+	mean := sum / n
+	variance := sumSq/n - mean*mean
+	if variance < 0 {
+		variance = 0
 	}
-	variance /= float64(len(audio))
 	if variance < 1e-7 {
 		variance = 1e-7
 	}
@@ -68,12 +69,10 @@ func computeWhisperMelFromPadded(padded []float32) []float32 {
 	// Power spectrum: 400-point real FFT -> 201 bins
 	nBins := whisperNFFT/2 + 1
 	mel := make([]float32, whisperNMels*whisper8sFrames)
-	window := make([]float32, whisperNFFT)
-	for i := 0; i < whisperNFFT; i++ {
-		window[i] = float32(0.5 * (1 - math.Cos(2*math.Pi*float64(i)/float64(whisperNFFT))))
-	}
+	window := getHannWindow(whisperNFFT)
 	filters := getMelFilterbank(whisperNMels, nBins)
 	fftBuf := make([]float32, whisperNFFT*2)
+	powerBuf := getPowerBuf(nBins)
 	for t := 0; t < whisper8sFrames; t++ {
 		offset := t * whisperHop
 		if offset+whisperNFFT > len(padded) {
@@ -83,11 +82,11 @@ func computeWhisperMelFromPadded(padded []float32) []float32 {
 			fftBuf[i*2] = padded[offset+i] * window[i]
 			fftBuf[i*2+1] = 0
 		}
-		power := realFFTPower(fftBuf, whisperNFFT)
+		realFFTPowerInto(fftBuf, whisperNFFT, powerBuf)
 		for m := 0; m < whisperNMels; m++ {
 			var v float32
 			for k := 0; k < nBins; k++ {
-				v += filters[m*nBins+k] * power[k]
+				v += filters[m*nBins+k] * powerBuf[k]
 			}
 			if v < 1e-10 {
 				v = 1e-10
@@ -115,10 +114,9 @@ func computeWhisperMelFromPadded(padded []float32) []float32 {
 	return mel
 }
 
-func realFFTPower(buf []float32, n int) []float32 {
-	// Simple DFT for power spectrum (n/2+1 bins). Not optimized but correct.
+// realFFTPowerInto writes the power spectrum (n/2+1 bins) into power. Caller must ensure len(power) >= n/2+1.
+func realFFTPowerInto(buf []float32, n int, power []float32) {
 	nOut := n/2 + 1
-	power := make([]float32, nOut)
 	for k := 0; k < nOut; k++ {
 		var re, im float64
 		for i := 0; i < n; i++ {
@@ -128,7 +126,29 @@ func realFFTPower(buf []float32, n int) []float32 {
 		}
 		power[k] = float32((re*re + im*im) / float64(n*n))
 	}
-	return power
+}
+
+var cachedHannWindow []float32
+
+func getHannWindow(n int) []float32 {
+	if cachedHannWindow != nil && len(cachedHannWindow) == n {
+		return cachedHannWindow
+	}
+	cachedHannWindow = make([]float32, n)
+	for i := 0; i < n; i++ {
+		cachedHannWindow[i] = float32(0.5 * (1 - math.Cos(2*math.Pi*float64(i)/float64(n))))
+	}
+	return cachedHannWindow
+}
+
+var cachedPowerBuf []float32
+
+func getPowerBuf(nBins int) []float32 {
+	if len(cachedPowerBuf) >= nBins {
+		return cachedPowerBuf[:nBins]
+	}
+	cachedPowerBuf = make([]float32, nBins)
+	return cachedPowerBuf
 }
 
 var cachedMelFilters []float32
