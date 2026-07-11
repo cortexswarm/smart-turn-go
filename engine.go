@@ -50,6 +50,9 @@ type Engine struct {
 // models, and creates sessions. The ONNX Runtime shared library path is taken from
 // Config.ONNXRuntimeLibPath if set, else from EnvONNXRuntimeLib. Caller is responsible
 // for resolving the lib path (e.g. via a utility or env).
+//
+// ONNX Runtime is initialized once per process. Calling New again reuses the existing
+// environment so multiple engines (e.g. microphone and system audio) can coexist.
 func New(cfg Config, cb Callbacks) (*Engine, error) {
 	if err := validateConfig(cfg); err != nil {
 		return nil, err
@@ -59,8 +62,12 @@ func New(cfg Config, cb Callbacks) (*Engine, error) {
 	} else if path := os.Getenv(EnvONNXRuntimeLib); path != "" {
 		ort.SetSharedLibraryPath(path)
 	}
-	if err := ort.InitializeEnvironment(); err != nil {
-		return nil, err
+	// ONNX Runtime allows one environment per process. Multiple Engine instances
+	// (e.g. mic + system audio) must share it — skip re-init if already done.
+	if !ort.IsInitialized() {
+		if err := ort.InitializeEnvironment(); err != nil {
+			return nil, err
+		}
 	}
 	e := &Engine{cfg: cfg, cb: cb}
 	vad, err := newSileroVAD(cfg.SileroVADModelPath)

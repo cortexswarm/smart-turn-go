@@ -79,7 +79,8 @@ Available callbacks:
 ## Engine API
 
 - `New(cfg Config, cb Callbacks) (*Engine, error)`  
-  Validates config; loads ONNX sessions.
+  Validates config; loads ONNX sessions. Safe to call more than once in a process —
+  ONNX Runtime is initialized once and shared across engines.
 - `Start()` / `Stop()`  
   Toggles listening, invokes relevant callbacks.
 - `PushPCM(chunk []float32) error`  
